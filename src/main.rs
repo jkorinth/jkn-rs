@@ -1,10 +1,13 @@
 use clap::*;
 use env_logger;
+use log::*;
+use std::env;
+use std::process;
 use termimad;
 mod config;
 mod db;
 mod topic;
-use log::*;
+mod note;
 
 #[derive(Parser)]
 #[command(version)]
@@ -79,11 +82,32 @@ fn main() {
                 }
             )
         }
+        Some(Commands::Note { topic }) => {
+            let editor = env::var("EDITOR").expect("EDITOR env var not set - don't know which editor to use!");
+            if let Some(t) = topic {
+                db.topic(Some(&t.as_str()));
+            }
+            let mut note = cfg.git.repopath.to_path_buf();
+            note.push(db.current_note());
+            debug!("current note: {:?}:", note);
+            let ret = process::Command::new(editor)
+                .args([note.as_os_str()])
+                //.spawn()
+                .status()
+                .expect("could not launch {editor}");
+            if ret.success() {
+                match db.commit(&db.current_note()) {
+                    Ok(()) => { info!("committed successfully"); }
+                    Err(e) => { error!("failed to commit: {:?}", e); }
+                }
+            } else {
+                warn!("editing was aborted, discarding changes");
+            }
+        }
         _ => {
             error!("unknown command");
         }
     }
     //termimad::print_inline("***Hello***, **world**! `this` is nice.\n");
-    //process::Command::new(editor).spawn().expect("could not launch {editor}").wait();
     //println!("current branch: {}", db.current_branch());
 }

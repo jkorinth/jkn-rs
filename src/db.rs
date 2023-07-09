@@ -1,18 +1,29 @@
 use crate::config::Config;
 use crate::topic::Topic;
+use crate::note::Note;
 use git2::*;
 use log::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::io;
+use chrono::prelude::*;
 
 #[derive(Debug)]
 pub enum DatabaseError {
     GitError(git2::Error),
+    IoError(io::Error),
     CouldNotCreateTopic(String),
+    FileDoesNotExist(String),
 }
 
 impl From<git2::Error> for DatabaseError {
     fn from(err: git2::Error) -> Self {
         DatabaseError::GitError(err)
+    }
+}
+
+impl From<io::Error> for DatabaseError {
+    fn from(err: io::Error) -> Self {
+        DatabaseError::IoError(err)
     }
 }
 
@@ -171,5 +182,34 @@ impl Database {
     fn list_notes(&self) -> Option<Vec<String>> {
         // TODO implement listing of files in worktree
         panic!("NOT IMPLEMENTED")
+    }
+
+    pub fn current_note(&self) -> String {
+        let now = Utc::now();
+        let (is_common_era, year) = now.year_ce();
+        format!("{}-{:02}-{:02}.md", year, now.month(), now.day())
+    }
+
+    pub fn commit(&self, notename: &str) -> Result<(), DatabaseError> {
+            let mut index = self.git.index()?;
+            debug!("adding {} to index ({:?})", notename, index.path());
+            index.add_path(&Path::new(notename))?;
+            let mut path = self.git.path().to_path_buf();
+            path.pop();
+            path.push(notename);
+            debug!("full path: {:?}", path);
+            let note = Note::from(&path);
+            let summary = &note.summary()?;
+            debug!("summary: {}", summary);
+            index.write()?;
+            let tree_oid = index.write_tree()?;
+            let tree = self.git.find_tree(tree_oid)?;
+            self.git.commit(Some("HEAD"),
+                            &self.git.signature()?,
+                            &self.git.signature()?,
+                            summary.trim_end(),
+                            &tree,
+                            &[&self.git.head()?.peel_to_commit()?])?;
+            Ok(())
     }
 }
