@@ -1,11 +1,12 @@
-use git2::Oid;
-
+#[derive(Debug)]
 pub struct Topic {
-    oid: Oid,
+    name: String,
 }
 
 impl Topic {
-    pub fn from_oid(oid: Oid) -> Topic {
-        Topic { oid: oid }
+    pub fn from_name(name: &str) -> Topic {
+        Topic {
+            name: name.to_string(),
+        }
     }
 }
