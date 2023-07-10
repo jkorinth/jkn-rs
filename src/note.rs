@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
-use std::io::{self, BufRead};
 use std::fs;
+use std::io::{self, BufRead};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Note {

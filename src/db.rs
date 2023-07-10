@@ -1,18 +1,18 @@
 use crate::config::Config;
-use crate::topic::Topic;
 use crate::note::Note;
+use crate::topic::Topic;
+use chrono::prelude::*;
 use git2::*;
 use log::*;
-use std::path::{Path, PathBuf};
 use std::io;
-use chrono::prelude::*;
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum DatabaseError {
     GitError(git2::Error),
     IoError(io::Error),
-    CouldNotCreateTopic(String),
-    FileDoesNotExist(String),
+    /*CouldNotCreateTopic(String),
+    FileDoesNotExist(String),*/
 }
 
 impl From<git2::Error> for DatabaseError {
@@ -47,10 +47,6 @@ impl Database {
                 })
             }
         }
-    }
-
-    pub fn from_repo(repo: Repository) -> Database {
-        Database { git: repo }
     }
 
     fn open_git(path: &Path) -> Result<Repository, DatabaseError> {
@@ -155,7 +151,6 @@ impl Database {
 
     fn current_branch(&self) -> String {
         let refe = self.git.head().expect("unable to get HEAD");
-        println!("SHA-1: {:?}", refe.peel_to_commit().expect("ok").id());
         refe.shorthand().unwrap().to_string()
     }
 
@@ -186,30 +181,32 @@ impl Database {
 
     pub fn current_note(&self) -> String {
         let now = Utc::now();
-        let (is_common_era, year) = now.year_ce();
+        let (_, year) = now.year_ce();
         format!("{}-{:02}-{:02}.md", year, now.month(), now.day())
     }
 
     pub fn commit(&self, notename: &str) -> Result<(), DatabaseError> {
-            let mut index = self.git.index()?;
-            debug!("adding {} to index ({:?})", notename, index.path());
-            index.add_path(&Path::new(notename))?;
-            let mut path = self.git.path().to_path_buf();
-            path.pop();
-            path.push(notename);
-            debug!("full path: {:?}", path);
-            let note = Note::from(&path);
-            let summary = &note.summary()?;
-            debug!("summary: {}", summary);
-            index.write()?;
-            let tree_oid = index.write_tree()?;
-            let tree = self.git.find_tree(tree_oid)?;
-            self.git.commit(Some("HEAD"),
-                            &self.git.signature()?,
-                            &self.git.signature()?,
-                            summary.trim_end(),
-                            &tree,
-                            &[&self.git.head()?.peel_to_commit()?])?;
-            Ok(())
+        let mut index = self.git.index()?;
+        debug!("adding {} to index ({:?})", notename, index.path());
+        index.add_path(&Path::new(notename))?;
+        let mut path = self.git.path().to_path_buf();
+        path.pop();
+        path.push(notename);
+        debug!("full path: {:?}", path);
+        let note = Note::from(&path);
+        let summary = &note.summary()?;
+        debug!("summary: {}", summary);
+        index.write()?;
+        let tree_oid = index.write_tree()?;
+        let tree = self.git.find_tree(tree_oid)?;
+        self.git.commit(
+            Some("HEAD"),
+            &self.git.signature()?,
+            &self.git.signature()?,
+            summary.trim_end(),
+            &tree,
+            &[&self.git.head()?.peel_to_commit()?],
+        )?;
+        Ok(())
     }
 }

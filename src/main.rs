@@ -3,11 +3,13 @@ use env_logger;
 use log::*;
 use std::env;
 use std::process;
-use termimad;
+
 mod config;
 mod db;
-mod topic;
+#[macro_use]
+mod md;
 mod note;
+mod topic;
 
 #[derive(Parser)]
 #[command(version)]
@@ -52,7 +54,27 @@ enum Commands {
     },
 }
 
-#[derive(Subcommand)]
+impl Commands {
+    pub fn exec(&self, db: &mut db::Database) {
+        match self {
+            Commands::Topic { name } => {
+                debug!("received topic command with name {:?}", name);
+                if let Some(n) = name {
+                    md!("created new topic **{:?}**: {:?}", name, db.topic(Some(n.as_str())));
+                } else {
+                    if let Some(t) = db.current_topic() {
+                        md!("current topic is **{}**\n", t);
+                    } else {
+                        md!("no topic set\n");
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
 enum ItemKind {
     #[clap(alias = "t")]
     Topics {},
@@ -66,39 +88,34 @@ fn main() {
     let db = db::Database::from_config(&cfg).expect("unable to open database");
     match &opts.command {
         Some(Commands::Topic { name }) => {
-            debug!("received topic command with name {:?}", name);
-            if let Some(n) = name {
-                println!("{:?}", db.topic(Some(n.as_str())));
-            } else {
-                println!("current topic is {:?}", db.current_topic());
-            }
         }
         Some(Commands::List { kind }) => {
-            println!(
-                "{:?}",
-                match kind {
-                    Some(ItemKind::Topics {}) => db.list(db::Entity::Topic),
-                    None => db.list(db::Entity::Topic),
-                }
-            )
+            md!("## {:?}\n", &kind.as_ref().unwrap_or(&ItemKind::Topics {}));
+            for e in db.list(db::Entity::Topic).unwrap().iter() {
+                md!("* {}\n", e);
+            }
         }
         Some(Commands::Note { topic }) => {
-            let editor = env::var("EDITOR").expect("EDITOR env var not set - don't know which editor to use!");
+            let editor = env::var("EDITOR")
+                .expect("EDITOR env var not set - don't know which editor to use!");
             if let Some(t) = topic {
-                db.topic(Some(&t.as_str()));
+                db.topic(Some(&t.as_str())).expect("could not switch topic");
             }
             let mut note = cfg.git.repopath.to_path_buf();
             note.push(db.current_note());
             debug!("current note: {:?}:", note);
             let ret = process::Command::new(editor)
                 .args([note.as_os_str()])
-                //.spawn()
                 .status()
                 .expect("could not launch {editor}");
             if ret.success() {
                 match db.commit(&db.current_note()) {
-                    Ok(()) => { info!("committed successfully"); }
-                    Err(e) => { error!("failed to commit: {:?}", e); }
+                    Ok(()) => {
+                        info!("committed successfully");
+                    }
+                    Err(e) => {
+                        error!("failed to commit: {:?}", e);
+                    }
                 }
             } else {
                 warn!("editing was aborted, discarding changes");
@@ -108,6 +125,4 @@ fn main() {
             error!("unknown command");
         }
     }
-    //termimad::print_inline("***Hello***, **world**! `this` is nice.\n");
-    //println!("current branch: {}", db.current_branch());
 }
