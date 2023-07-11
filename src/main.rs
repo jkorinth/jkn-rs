@@ -1,15 +1,10 @@
 use clap::*;
 use env_logger;
+use jkn::*;
+use jkn::config::{self, Config};
 use log::*;
 use std::env;
 use std::process;
-
-mod config;
-mod db;
-#[macro_use]
-mod md;
-mod note;
-mod topic;
 
 #[derive(Parser)]
 #[command(version)]
@@ -55,12 +50,16 @@ enum Commands {
 }
 
 impl Commands {
-    pub fn exec(&self, db: &mut db::Database) {
+    pub fn exec(&self, cfg: &Box<dyn config::Config>, db: &mut db::Database) {
         match self {
             Commands::Topic { name } => {
                 debug!("received topic command with name {:?}", name);
                 if let Some(n) = name {
-                    md!("created new topic **{:?}**: {:?}", name, db.topic(Some(n.as_str())));
+                    md!(
+                        "created new topic **{:?}**: {:?}",
+                        name,
+                        db.topic(Some(n.as_str()))
+                    );
                 } else {
                     if let Some(t) = db.current_topic() {
                         md!("current topic is **{}**\n", t);
@@ -69,6 +68,41 @@ impl Commands {
                     }
                 }
             }
+
+            Commands::List { kind } => {
+                md!("## {:?}\n", &kind.as_ref().unwrap_or(&ItemKind::Topics {}));
+                for e in db.list(db::Entity::Topic).unwrap().iter() {
+                    md::md!("* {}\n", e);
+                }
+            }
+
+            Commands::Note { topic } => {
+                let editor = env::var("EDITOR")
+                    .expect("EDITOR env var not set - don't know which editor to use!");
+                if let Some(t) = topic {
+                    db.topic(Some(&t.as_str())).expect("could not switch topic");
+                }
+                let mut note = cfg.git().repopath.to_path_buf();
+                note.push(db.current_note());
+                debug!("current note: {:?}:", note);
+                let ret = process::Command::new(editor)
+                    .args([note.as_os_str()])
+                    .status()
+                    .expect("could not launch {editor}");
+                if ret.success() {
+                    match db.commit(&db.current_note()) {
+                        Ok(()) => {
+                            info!("committed successfully");
+                        }
+                        Err(e) => {
+                            error!("failed to commit: {:?}", e);
+                        }
+                    }
+                } else {
+                    warn!("editing was aborted, discarding changes");
+                }
+            }
+
             _ => {}
         }
     }
@@ -83,46 +117,16 @@ enum ItemKind {
 fn main() {
     env_logger::init();
     let opts = Opts::parse();
-    let cfg = config::Config::load().expect("could not load configuration");
+    let cfg = config::ConfigImpl::load().expect("could not load configuration");
     cfg.save().expect("failed to save config");
-    let db = db::Database::from_config(&cfg).expect("unable to open database");
-    match &opts.command {
-        Some(Commands::Topic { name }) => {
-        }
-        Some(Commands::List { kind }) => {
-            md!("## {:?}\n", &kind.as_ref().unwrap_or(&ItemKind::Topics {}));
-            for e in db.list(db::Entity::Topic).unwrap().iter() {
-                md!("* {}\n", e);
-            }
-        }
-        Some(Commands::Note { topic }) => {
-            let editor = env::var("EDITOR")
-                .expect("EDITOR env var not set - don't know which editor to use!");
-            if let Some(t) = topic {
-                db.topic(Some(&t.as_str())).expect("could not switch topic");
-            }
-            let mut note = cfg.git.repopath.to_path_buf();
-            note.push(db.current_note());
-            debug!("current note: {:?}:", note);
-            let ret = process::Command::new(editor)
-                .args([note.as_os_str()])
-                .status()
-                .expect("could not launch {editor}");
-            if ret.success() {
-                match db.commit(&db.current_note()) {
-                    Ok(()) => {
-                        info!("committed successfully");
-                    }
-                    Err(e) => {
-                        error!("failed to commit: {:?}", e);
-                    }
-                }
-            } else {
-                warn!("editing was aborted, discarding changes");
-            }
-        }
+    let mut db = jkn::db::Database::from_config(&cfg).expect("unable to open database");
+    if let Some(cmd) = opts.command {
+        cmd.exec(&cfg, &mut db);
+    }
+    /*match &opts.command {
+        Some(Commands::Topic { _name }) => {}
         _ => {
             error!("unknown command");
         }
-    }
+    }*/
 }

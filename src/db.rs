@@ -1,6 +1,8 @@
+use mockall_double::double;
+#[double]
 use crate::config::Config;
-use crate::note::Note;
-use crate::topic::Topic;
+use super::note::Note;
+use super::topic::Topic;
 use chrono::prelude::*;
 use git2::*;
 use log::*;
@@ -11,8 +13,6 @@ use std::path::Path;
 pub enum DatabaseError {
     GitError(git2::Error),
     IoError(io::Error),
-    /*CouldNotCreateTopic(String),
-    FileDoesNotExist(String),*/
 }
 
 impl From<git2::Error> for DatabaseError {
@@ -37,13 +37,13 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn from_config(cfg: &Config) -> Result<Database, DatabaseError> {
-        match Database::open_git(&cfg.git.repopath) {
+    pub fn from_config(cfg: &Box<dyn Config>) -> Result<Database, DatabaseError> {
+        match Database::open_git(&cfg.git().repopath) {
             Ok(repo) => Ok(Database { git: repo }),
             Err(e) => {
                 warn!("could not open database, re-initializing repo: {:?}", e);
                 Ok(Database {
-                    git: Database::init_git(&cfg.git.repopath)?,
+                    git: Database::init_git(&cfg.git().repopath)?,
                 })
             }
         }
