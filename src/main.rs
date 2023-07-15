@@ -1,8 +1,8 @@
 use clap::*;
 use env_logger;
-use jkn::*;
 use jkn::config::Config;
 use jkn::config::ConfigImpl;
+use jkn::*;
 use log::*;
 use std::env;
 use std::process;
@@ -47,6 +47,9 @@ enum Commands {
         /// select topic
         #[arg(short, long)]
         topic: Option<String>,
+        /// amend last note?
+        #[arg(short, long)]
+        amend: Option<bool>,
     },
 }
 
@@ -77,7 +80,7 @@ impl Commands {
                 }
             }
 
-            Commands::Note { topic } => {
+            Commands::Note { topic, amend } => {
                 let editor = env::var("EDITOR")
                     .expect("EDITOR env var not set - don't know which editor to use!");
                 if let Some(t) = topic {
@@ -91,7 +94,10 @@ impl Commands {
                     .status()
                     .expect("could not launch {editor}");
                 if ret.success() {
-                    match db.commit(&db.current_note()) {
+                    match db.commit(
+                        &db.current_note(),
+                        if let Some(a) = amend { *a } else { false },
+                    ) {
                         Ok(()) => {
                             info!("committed successfully");
                         }
@@ -116,7 +122,13 @@ enum ItemKind {
 }
 
 fn main() {
+    use inquire::Text;
     env_logger::init();
+    let name = Text::new("Who the fuck are you?").prompt();
+    match name {
+        Ok(name) => println!("Well, {}, let's go then.", name),
+        Err(_) => println!("Too fucking dumb to spell your own name, eh? Nevermind."),
+    }
     let opts = Opts::parse();
     let cfg = ConfigImpl::load().expect("could not load configuration");
     cfg.save().expect("failed to save config");

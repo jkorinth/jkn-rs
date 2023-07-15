@@ -1,6 +1,6 @@
-use crate::config::Config;
 use super::note::Note;
 use super::topic::Topic;
+use crate::config::Config;
 use chrono::prelude::*;
 use git2::*;
 use log::*;
@@ -184,7 +184,14 @@ impl Database {
         format!("{}-{:02}-{:02}.md", year, now.month(), now.day())
     }
 
-    pub fn commit(&self, notename: &str) -> Result<(), DatabaseError> {
+    pub fn amend(&self, notename: &str) -> Result<(), DatabaseError> {
+        self.commit(notename, true)
+    }
+
+    pub fn commit(&self, notename: &str, _amend: bool) -> Result<(), DatabaseError> {
+        if _amend {
+            warn!("amend is not implemented yet, will create new commit");
+        }
         let mut index = self.git.index()?;
         debug!("adding {} to index ({:?})", notename, index.path());
         index.add_path(&Path::new(notename))?;

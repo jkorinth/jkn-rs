@@ -1,13 +1,13 @@
 #![cfg(test)]
 
+use jkn::config::Config;
+use jkn::config::GitConfig;
+use jkn::db::Database;
+use log::*;
 use std::io;
 use std::path::PathBuf;
 use std::sync::Once;
 use tempfile::{tempdir, TempDir};
-use jkn::db::Database;
-use jkn::config::Config;
-use jkn::config::GitConfig;
-use log::*;
 
 #[allow(dead_code)]
 struct MockConfig {
@@ -24,7 +24,10 @@ fn init_logger() {
 }
 
 impl Config for MockConfig {
-    fn load() -> Result<Box<dyn Config>, String> where Self: Sized {
+    fn load() -> Result<Box<dyn Config>, String>
+    where
+        Self: Sized,
+    {
         let tmpdir = tempdir().expect("could not create temp dir");
         let tmppath = tmpdir.path();
         debug!("tmploc = {:?}", tmppath);

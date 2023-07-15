@@ -12,7 +12,9 @@ pub struct GitConfig {
 }
 
 pub trait Config {
-    fn load() -> Result<Box<dyn Config>, String> where Self: Sized;
+    fn load() -> Result<Box<dyn Config>, String>
+    where
+        Self: Sized;
     fn loc(&self) -> &PathBuf;
     fn git(&self) -> &GitConfig;
     fn save(&self) -> io::Result<()>;
