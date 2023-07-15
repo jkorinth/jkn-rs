@@ -1,5 +1,3 @@
-use mockall_double::double;
-#[double]
 use crate::config::Config;
 use super::note::Note;
 use super::topic::Topic;
@@ -125,10 +123,11 @@ impl Database {
 
     pub fn topic(&self, name: Option<&str>) -> Result<Topic, DatabaseError> {
         if let Some(n) = name {
-            let branch = self
-                .find_topic_branch(n)
-                .or_else(|| Some(self.make_topic_branch(n).ok()?))
-                .unwrap();
+            let mut b = self.find_topic_branch(n);
+            if b.is_none() {
+                b = Some(self.make_topic_branch(n)?);
+            }
+            let branch = b.unwrap();
             self.git
                 .checkout_tree(&branch.get().resolve()?.peel_to_tree()?.as_object(), None)?;
             self.git

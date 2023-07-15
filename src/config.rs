@@ -5,14 +5,12 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use toml;
-use mockall::{automock, predicate::*};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GitConfig {
     pub repopath: PathBuf,
 }
 
-#[automock]
 pub trait Config {
     fn load() -> Result<Box<dyn Config>, String> where Self: Sized;
     fn loc(&self) -> &PathBuf;

@@ -1,7 +1,8 @@
 use clap::*;
 use env_logger;
 use jkn::*;
-use jkn::config::{self, Config};
+use jkn::config::Config;
+use jkn::config::ConfigImpl;
 use log::*;
 use std::env;
 use std::process;
@@ -50,7 +51,7 @@ enum Commands {
 }
 
 impl Commands {
-    pub fn exec(&self, cfg: &Box<dyn config::Config>, db: &mut db::Database) {
+    pub fn exec(&self, cfg: &Box<dyn Config>, db: &mut db::Database) {
         match self {
             Commands::Topic { name } => {
                 debug!("received topic command with name {:?}", name);
@@ -117,16 +118,10 @@ enum ItemKind {
 fn main() {
     env_logger::init();
     let opts = Opts::parse();
-    let cfg = config::ConfigImpl::load().expect("could not load configuration");
+    let cfg = ConfigImpl::load().expect("could not load configuration");
     cfg.save().expect("failed to save config");
     let mut db = jkn::db::Database::from_config(&cfg).expect("unable to open database");
     if let Some(cmd) = opts.command {
         cmd.exec(&cfg, &mut db);
     }
-    /*match &opts.command {
-        Some(Commands::Topic { _name }) => {}
-        _ => {
-            error!("unknown command");
-        }
-    }*/
 }
