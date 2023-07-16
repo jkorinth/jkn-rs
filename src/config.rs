@@ -1,3 +1,4 @@
+use crate::Result;
 use log::*;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -12,7 +13,7 @@ pub struct GitConfig {
 }
 
 pub trait Config {
-    fn load() -> Result<Box<dyn Config>, String>
+    fn load() -> Result<Self>
     where
         Self: Sized;
     fn loc(&self) -> &PathBuf;
@@ -27,7 +28,7 @@ pub struct ConfigImpl {
 }
 
 impl Config for ConfigImpl {
-    fn load() -> Result<Box<dyn Config>, String> {
+    fn load() -> Result<Self> {
         let home = env::var("HOME").expect("HOME env var is not set");
         let xdg_config_home = env::var("XDG_CONFIG_HOME");
 
@@ -37,7 +38,7 @@ impl Config for ConfigImpl {
                 info!("found config in XDK_CONFIG_HOME");
                 let cfgcontent =
                     fs::read_to_string(cfgfile.as_path()).expect("could not read file");
-                let cfg = Box::new(toml::from_str::<Self>(&cfgcontent).unwrap());
+                let cfg = toml::from_str::<Self>(&cfgcontent).unwrap();
                 return Ok(cfg);
             }
         }
@@ -46,12 +47,12 @@ impl Config for ConfigImpl {
         if cfgfile.exists() {
             info!("found config in HOME");
             let cfgcontent = fs::read_to_string(cfgfile.as_path()).expect("could not read file");
-            let cfg = Box::new(toml::from_str::<Self>(&cfgcontent).unwrap());
+            let cfg = toml::from_str::<Self>(&cfgcontent).unwrap();
             return Ok(cfg);
         }
 
         warn!("found no existing config, using defaults");
-        Ok(Box::new(Self::default()))
+        Ok(Self::default())
     }
 
     fn loc(&self) -> &PathBuf {
@@ -91,4 +92,8 @@ impl Default for ConfigImpl {
             },
         }
     }
+}
+
+pub fn load() -> Result<impl Config> {
+    Ok(ConfigImpl::load()?)
 }
