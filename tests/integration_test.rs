@@ -2,7 +2,8 @@
 
 use jkn::config::Config;
 use jkn::config::GitConfig;
-use jkn::db::Database;
+use jkn::db::{self, Database};
+use jkn::Result;
 use log::*;
 use std::io;
 use std::path::PathBuf;
@@ -24,20 +25,20 @@ fn init_logger() {
 }
 
 impl Config for MockConfig {
-    fn load() -> Result<Box<dyn Config>, String>
+    fn load() -> Result<Self>
     where
         Self: Sized,
     {
         let tmpdir = tempdir().expect("could not create temp dir");
         let tmppath = tmpdir.path();
         debug!("tmploc = {:?}", tmppath);
-        Ok(Box::new(MockConfig {
+        Ok(MockConfig {
             loc: PathBuf::from(tmppath),
             git: GitConfig {
                 repopath: tmppath.to_path_buf(),
             },
             tmpdir: tmpdir,
-        }))
+        })
     }
 
     fn loc(&self) -> &PathBuf {
@@ -55,8 +56,8 @@ impl Config for MockConfig {
 
 #[test]
 fn it_respects_the_config_path() {
-    let cfg = Box::new(MockConfig::load().unwrap());
-    let db = Database::from_config(&cfg).expect("unable to open database");
+    let cfg = MockConfig::load().unwrap();
+    let db = db::from_config(&cfg).expect("unable to open database");
     let _topic = db
         .topic(Some("test_topic"))
         .expect("unable to create topic");
