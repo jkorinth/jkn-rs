@@ -5,10 +5,10 @@ use crate::config::Config;
 use chrono::prelude::*;
 use git2::*;
 use log::*;
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
 use regex::Regex;
+use std::fs;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub enum Error {
@@ -37,6 +37,7 @@ pub trait Database {
     fn commit(&self, notename: &str, _amend: bool) -> Result<()>;
     fn list(&self, kind: Entity) -> Result<Vec<String>>;
     fn root_path(&self) -> PathBuf;
+    fn content(&self, notename: &str) -> Result<String>;
 }
 
 pub struct DatabaseImpl {
@@ -136,6 +137,14 @@ impl Database for DatabaseImpl {
 
     fn root_path(&self) -> PathBuf {
         self.path.clone()
+    }
+
+    fn content(&self, notename: &str) -> Result<String> {
+        let mut path = self.path.clone();
+        path.push(notename);
+        let mut content = String::new();
+        fs::File::open(path)?.read_to_string(&mut content)?;
+        Ok(content)
     }
 }
 
@@ -242,7 +251,7 @@ impl DatabaseImpl {
     fn canonicalize(&self, name: &str) -> String {
         let spaces = Regex::new(r"[[:space:]-/\\:.,!]").unwrap();
         let space = spaces.replace_all(name, "_");
-        let others  = Regex::new(r"[^[:alpha:]]_").unwrap();
+        let others = Regex::new(r"[^[:alpha:]]_").unwrap();
         let other = others.replace_all(&space, "");
         other.to_lowercase()
     }
