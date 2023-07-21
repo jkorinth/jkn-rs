@@ -1,5 +1,7 @@
 use crossterm::{event, event::KeyCode, execute, terminal::*};
+use jkn::{config, db, db::Database};
 use log::debug;
+use regex::Regex;
 use std::{cell::RefCell, io, time::Duration};
 use termimad::{Area, MadSkin, MadView};
 use tui::{
@@ -13,7 +15,7 @@ use tui::{
 };
 
 struct UserInterface<'a> {
-    notes: Vec<String>,
+    db: Box<dyn db::Database>,
     layout: Layout,
     content: Block<'a>,
     notelist: List<'a>,
@@ -23,7 +25,10 @@ struct UserInterface<'a> {
 
 impl Default for UserInterface<'_> {
     fn default() -> Self {
-        let notes: Vec<String> = vec![];
+        let cfg = config::load().expect("could not load jkn config");
+        let database = db::from_config(&cfg).expect("unable to open database");
+        let notes: Vec<String> = database.list(db::Entity::Note).unwrap();
+
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .margin(1)
@@ -41,17 +46,22 @@ impl Default for UserInterface<'_> {
         .highlight_symbol(">> ");
         let content = Block::default().title(" Content ").borders(Borders::ALL);
         let mut state = ListState::default();
+        if notes.len() > 0 {
+            state.select(Some(0));
+        }
         let mdstr = String::from("**Hello**\nlet's see *some* Markdown\nOi!\n\n## Bla\nfeck");
         let mv = MadView::from(mdstr, Area::new(0, 0, 0, 0), MadSkin::default());
 
-        Self {
-            notes: notes,
+        let mut s = Self {
+            db: Box::new(database),
             layout: layout,
             notelist: notelist,
             notelist_state: state,
             content: content,
             mv: mv,
-        }
+        };
+        s.update_content(s.notelist_state.selected());
+        s
     }
 }
 
@@ -61,7 +71,7 @@ impl UserInterface<'_> {
         f.render_stateful_widget(self.notelist.clone(), cs[0], &mut self.notelist_state);
         f.render_widget(self.content.clone(), cs[1]);
         let r = self.content.inner(cs[1]);
-        let a = Area::new(r.x + 1, r.y + 1, r.width - 2, /*r.height - */ 2);
+        let a = Area::new(r.x + 1, r.y + 1, r.width - 2, r.height - 2);
         self.mv.resize(&a);
         self.mv.write();
     }
@@ -82,8 +92,14 @@ impl UserInterface<'_> {
 
     fn update_content(&mut self, idx: Option<usize>) {
         if let Some(n) = idx {
+            let notes = self.db.list(db::Entity::Note).unwrap();
+            let content = self
+                .db
+                .content(&notes[n])
+                .expect(&format!("could not open file {}", &notes[n]));
+            let crs = Regex::new(r"\r").unwrap();
             self.mv = MadView::from(
-                format!("**Now Showing**\n\nNote *#{}*", n),
+                crs.replace_all(&content, "").to_string(),
                 Area::new(0, 0, 0, 0),
                 MadSkin::default(),
             );
@@ -92,8 +108,9 @@ impl UserInterface<'_> {
 
     fn next(&mut self) {
         if let Some(idx) = self.notelist_state.selected() {
-            self.notelist_state
-                .select(Some((idx + 1) % self.notes.len()));
+            self.notelist_state.select(Some(
+                (idx + 1) % self.db.list(db::Entity::Note).unwrap().len(),
+            ));
             self.update_content(self.notelist_state.selected());
         }
     }
@@ -101,7 +118,7 @@ impl UserInterface<'_> {
     fn previous(&mut self) {
         if let Some(idx) = self.notelist_state.selected() {
             self.notelist_state.select(if idx == 0 {
-                Some(self.notes.len() - 1)
+                Some(self.db.list(db::Entity::Note).unwrap().len() - 1)
             } else {
                 Some(idx - 1)
             });
