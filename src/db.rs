@@ -8,6 +8,7 @@ use log::*;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use regex::Regex;
 
 #[derive(Debug)]
 pub enum Error {
@@ -35,6 +36,7 @@ pub trait Database {
     fn amend(&self, notename: &str) -> Result<()>;
     fn commit(&self, notename: &str, _amend: bool) -> Result<()>;
     fn list(&self, kind: Entity) -> Result<Vec<String>>;
+    fn root_path(&self) -> PathBuf;
 }
 
 pub struct DatabaseImpl {
@@ -61,9 +63,10 @@ impl Database for DatabaseImpl {
 
     fn topic(&self, name: Option<&str>) -> Result<Topic> {
         if let Some(n) = name {
-            let mut b = self.find_topic_branch(n);
+            let cn = self.canonicalize(n);
+            let mut b = self.find_topic_branch(&cn);
             if b.is_none() {
-                b = Some(self.make_topic_branch(n)?);
+                b = Some(self.make_topic_branch(&cn)?);
             }
             let branch = b.unwrap();
             self.git
@@ -129,6 +132,10 @@ impl Database for DatabaseImpl {
             &[&self.git.head()?.peel_to_commit()?],
         )?;
         Ok(())
+    }
+
+    fn root_path(&self) -> PathBuf {
+        self.path.clone()
     }
 }
 
@@ -230,6 +237,14 @@ impl DatabaseImpl {
             .collect();
         entries.sort();
         Ok(entries)
+    }
+
+    fn canonicalize(&self, name: &str) -> String {
+        let spaces = Regex::new(r"[[:space:]-/\\:.,!]").unwrap();
+        let space = spaces.replace_all(name, "_");
+        let others  = Regex::new(r"[^[:alpha:]]_").unwrap();
+        let other = others.replace_all(&space, "");
+        other.to_lowercase()
     }
 }
 
