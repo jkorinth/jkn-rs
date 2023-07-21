@@ -3,7 +3,6 @@ use jkn::config;
 use jkn::db;
 use log::*;
 use regex::{Captures, Regex};
-use reqwest::blocking;
 use std::cmp;
 use std::collections::HashMap;
 use std::fs;
@@ -12,6 +11,7 @@ use std::iter::zip;
 use std::path::PathBuf;
 use time::format_description;
 use time::macros::date;
+use tqdm::tqdm;
 
 use String as Topic;
 
@@ -72,7 +72,9 @@ fn get_texts(mono: &str, topics: &Vec<Topic>) -> HashMap<Topic, String> {
 
 fn escape_markdown(txt: &str) -> String {
     let rep = Regex::new(r"([`'*_#])").unwrap();
-    rep.replace_all(txt, |caps: &Captures| format!("\\{}", &caps[1]))
+    let cr = Regex::new(r"\r").unwrap();
+    let txt2 = cr.replace_all(txt, "");
+    rep.replace_all(&txt2, |caps: &Captures| format!("\\{}", &caps[1]))
         .to_string()
 }
 
@@ -100,7 +102,7 @@ fn split_into_commits(
             let mut path = PathBuf::new();
             path.push(format!("{}.md", notename));
             trace!("{}: [{:?}]\n{}", &topic, edate, commit);
-            thm.insert(path, commit);
+            thm.insert(path, commit + "\n");
             edate = edate.next_day().unwrap();
         }
         ret.insert(topic.clone(), thm);
@@ -111,8 +113,10 @@ fn split_into_commits(
 fn commit_to_db(db: &impl db::Database, data: &HashMap<Topic, HashMap<PathBuf, String>>) {
     let mut no_commits: usize = 0;
     let mut no_topics: usize = 0;
-    for (&ref topic, &ref commits) in data.iter() {
-        db.topic(Some(topic)).expect(&format!("could not switch to topic {}", &topic));
+
+    for (&ref topic, &ref commits) in tqdm(data.iter()) {
+        db.topic(Some(topic))
+            .expect(&format!("could not switch to topic {}", &topic));
         for (&ref p, &ref txt) in commits.iter() {
             let mut path = db.root_path();
             path.push(format!("{}", p.to_str().unwrap()));
@@ -120,12 +124,16 @@ fn commit_to_db(db: &impl db::Database, data: &HashMap<Topic, HashMap<PathBuf, S
                 fs::File::create(&path).expect(&format!("could not create file: {:?}", path));
             write!(f, "{}", txt).expect(&format!("could not write file: {:?}", path));
             debug!("wrote file: {:?}", path);
-            db.commit(path.file_name().unwrap().to_str().unwrap(), false).expect("could not commit");
+            db.commit(path.file_name().unwrap().to_str().unwrap(), false)
+                .expect("could not commit");
             no_commits += 1;
         }
         no_topics += 1;
     }
-    info!("done! wrote {} commits for {} topics.", no_commits, no_topics);
+    info!(
+        "done! wrote {} commits for {} topics.",
+        no_commits, no_topics
+    );
 }
 
 fn main() {

@@ -798,6 +798,7 @@ dependencies = [
  "termimad",
  "time 0.3.23",
  "toml",
+ "tqdm",
  "tui",
 ]
 
@@ -1586,6 +1587,15 @@ name = "tower-service"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
+
+[[package]]
+name = "tqdm"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "701634e797808d8315150be4858059194262210f358e835cf8ae38a3f37e0acf"
+dependencies = [
+ "crossterm 0.25.0",
+]
 
 [[package]]
 name = "tracing"
