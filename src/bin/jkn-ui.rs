@@ -1,13 +1,12 @@
 use crossterm::{event, event::KeyCode, execute, terminal::*};
 use jkn::{config, db, db::Database};
-use log::debug;
+
 use regex::Regex;
-use std::{cell::RefCell, io, time::Duration};
+use std::{io, time::Duration};
 use termimad::{Area, MadSkin, MadView};
 use tui::{
     backend::{Backend, CrosstermBackend},
-    buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::*,
     text::*,
     widgets::*,
@@ -78,7 +77,7 @@ impl UserInterface<'_> {
         let r = self.content.inner(cs[1]);
         let a = Area::new(r.x + 1, r.y + 1, r.width - 2, r.height - 2);
         self.mv.resize(&a);
-        self.mv.write();
+        let _ = self.mv.write();
     }
 
     pub fn handle_keypress(&mut self, ev: &event::KeyEvent) -> bool {
