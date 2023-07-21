@@ -32,7 +32,7 @@ impl Default for UserInterface<'_> {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .margin(1)
-            .constraints([Constraint::Percentage(20), Constraint::Percentage(80)]);
+            .constraints([Constraint::Length(18), Constraint::Percentage(80)]);
         let notes_block = Block::default().title(" Notes ").borders(Borders::ALL);
         let notelist = List::new(
             notes
@@ -42,8 +42,8 @@ impl Default for UserInterface<'_> {
         )
         .block(notes_block)
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-        .highlight_symbol(">> ");
+        .highlight_style(Style::default().add_modifier(Modifier::ITALIC).fg(Color::Black).bg(Color::LightBlue))
+        .highlight_symbol("> ");
         let content = Block::default().title(" Content ").borders(Borders::ALL);
         let mut state = ListState::default();
         if notes.len() > 0 {
