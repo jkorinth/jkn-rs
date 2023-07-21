@@ -42,7 +42,12 @@ impl Default for UserInterface<'_> {
         )
         .block(notes_block)
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC).fg(Color::Black).bg(Color::LightBlue))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::ITALIC)
+                .fg(Color::Black)
+                .bg(Color::LightBlue),
+        )
         .highlight_symbol("> ");
         let content = Block::default().title(" Content ").borders(Borders::ALL);
         let mut state = ListState::default();

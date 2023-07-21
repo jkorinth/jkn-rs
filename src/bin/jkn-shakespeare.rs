@@ -95,7 +95,7 @@ fn split_into_commits(
         for ps in paragraphs.chunks(paragraphs_per_day) {
             let commit = ps
                 .iter()
-                .fold(format!("Working on {}\n\n", &topic,), |c, n| c + n);
+                .fold(format!("Working on {}\n\n", &topic,), |c, n| c + "\n\n" + n);
             let notename = edate
                 .format(&format_description::parse("[year]-[month]-[day]").unwrap())
                 .unwrap();
